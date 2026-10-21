@@ -19,20 +19,11 @@ One script, one menu. Pick what you want with the arrow keys, and the installer 
 
 It is written in pure Bash, so there is nothing to install before you can run it: no `whiptail`, no `dialog`, no Python.
 
-```
-  ⛏  Minecraft Installer   v2.0.0
-  ────────────────────────────────────────────────────────────────
-  Ubuntu 24.04 LTS · apt · x86_64
+<div align="center">
 
-  Java Edition
+<img src="https://iili.io/nOqInu1.png" alt="Minecraft Linux Installer terminal UI" width="720">
 
-  ❯ ○ Java Runtime             OpenJDK 21
-    ◉ Prism Launcher           mods & instances (recommended)
-    ○ Official Launcher        Flatpak
-    ○ Java Server              latest release straight from Mojang
-
-  ↑/↓ move    Space toggle    Enter confirm    q back
-```
+</div>
 
 ## Features
 
