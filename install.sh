@@ -1,8 +1,4 @@
 #!/usr/bin/env bash
-# =============================================================================
-#  Minecraft Linux Installer
-#  Java Edition & Bedrock Edition – mit eigener TUI (reines Bash, keine Extras)
-# =============================================================================
 set -uo pipefail
 
 VERSION="2.0.0"
@@ -19,9 +15,6 @@ LOG="$(mktemp "${TMPDIR:-/tmp}/mc-installer.XXXXXX")"
 TOTAL_FAILS=0
 FAILS=0
 
-# --------------------------------------------------------------------------
-# Optik
-# --------------------------------------------------------------------------
 ESC=$'\e'
 R="${ESC}[0m"; B="${ESC}[1m"; DIM="${ESC}[2m"
 ACC="${ESC}[38;5;78m"; RED="${ESC}[38;5;203m"; YEL="${ESC}[38;5;221m"
@@ -35,17 +28,12 @@ cur_hide() { printf '%s' "${ESC}[?25l"; }
 
 has() { command -v "$1" >/dev/null 2>&1; }
 
-# --------------------------------------------------------------------------
-# System
-# --------------------------------------------------------------------------
 PM=""; DISTRO="Linux"; ARCH="$(uname -m)"
 if (( EUID == 0 )); then SUDO=""; else SUDO="sudo"; fi
 
 detect_system() {
   if [[ -r /etc/os-release ]]; then
-    # shellcheck disable=SC1091
-    . /etc/os-release
-    DISTRO="${PRETTY_NAME:-${NAME:-Linux}}"
+    DISTRO="$( . /etc/os-release; printf '%s' "${PRETTY_NAME:-${NAME:-Linux}}" )"
   fi
   if   has apt-get; then PM="apt"
   elif has dnf;     then PM="dnf"
@@ -54,9 +42,6 @@ detect_system() {
   fi
 }
 
-# --------------------------------------------------------------------------
-# Eingabe
-# --------------------------------------------------------------------------
 read_key() {
   local k rest=""
   IFS= read -rsn1 k || { echo quit; return; }
@@ -79,9 +64,6 @@ read_key() {
   esac
 }
 
-# --------------------------------------------------------------------------
-# Layout
-# --------------------------------------------------------------------------
 header() {
   local w line
   w=$(( $(tput cols 2>/dev/null || echo 80) - 4 ))
@@ -92,12 +74,10 @@ header() {
   f ""
   f "  ${ACC}${B}⛏  ${APP}${R}${DIM}   v${VERSION}${R}"
   f "  ${DIM}${line}${R}"
-  f "  ${DIM}${DISTRO} · ${PM:-kein Paketmanager} · ${ARCH}${R}"
+  f "  ${DIM}${DISTRO} · ${PM:-no package manager} · ${ARCH}${R}"
   f ""
 }
 
-# tui_menu TITEL ARRAYNAME [START]  ->  MENU_RESULT = Tag, Rückgabe 1 bei "zurück"
-# Eintrag: tag|Label|Beschreibung
 tui_menu() {
   local title="$1"; local -n _m="$2"
   local cur="${3:-0}" n=${#_m[@]} i key tag label desc pad
@@ -115,7 +95,7 @@ tui_menu() {
       fi
     done
     f ""
-    f "  ${DIM}↑/↓ bewegen    Enter wählen    q zurück${R}"
+    f "  ${DIM}↑/↓ move    Enter select    q back${R}"
     flush
     key="$(read_key)"
     case "$key" in
@@ -127,8 +107,6 @@ tui_menu() {
   done
 }
 
-# tui_multi TITEL ARRAYNAME  ->  CHOSEN (Array von Tags), Rückgabe 1 bei "zurück"
-# Eintrag: tag|Label|Beschreibung|vorausgewählt(1/0)
 tui_multi() {
   local title="$1"; local -n _x="$2"
   local cur=0 n=${#_x[@]} i key tag label desc on mark pad
@@ -152,7 +130,7 @@ tui_multi() {
       fi
     done
     f ""
-    f "  ${DIM}↑/↓ bewegen    Leertaste auswählen    Enter bestätigen    q zurück${R}"
+    f "  ${DIM}↑/↓ move    Space toggle    Enter confirm    q back${R}"
     flush
     key="$(read_key)"
     case "$key" in
@@ -173,7 +151,6 @@ tui_multi() {
   done
 }
 
-# tui_confirm TITEL [INFO]  ->  Rückgabe 0 = Ja, 1 = Nein
 tui_confirm() {
   local title="$1" info="${2:-}" sel=0 key yes no
   while true; do
@@ -182,13 +159,13 @@ tui_confirm() {
     [[ -n "$info" ]] && f "  ${DIM}${info}${R}"
     f ""
     if (( sel == 0 )); then
-      yes="${ACC}${B}❯ Ja${R}"; no="${DIM}  Nein${R}"
+      yes="${ACC}${B}❯ Yes${R}"; no="${DIM}  No${R}"
     else
-      yes="${DIM}  Ja${R}";     no="${ACC}${B}❯ Nein${R}"
+      yes="${DIM}  Yes${R}";     no="${ACC}${B}❯ No${R}"
     fi
     f "  ${yes}     ${no}"
     f ""
-    f "  ${DIM}←/→ wählen    Enter bestätigen    y / n${R}"
+    f "  ${DIM}←/→ choose    Enter confirm    y / n${R}"
     flush
     key="$(read_key)"
     case "$key" in
@@ -200,12 +177,11 @@ tui_confirm() {
   done
 }
 
-# tui_input TITEL STANDARD  ->  INPUT_RESULT
 tui_input() {
   local v
   header
   f "  ${B}$1${R}"
-  f "  ${DIM}Enter zum Bestätigen${R}"
+  f "  ${DIM}Press Enter to confirm${R}"
   f ""
   flush
   printf '  %s❯%s ' "$ACC" "$R"
@@ -216,9 +192,6 @@ tui_input() {
   INPUT_RESULT="${v/#\~/$HOME}"
 }
 
-# --------------------------------------------------------------------------
-# Ausgabe-Bildschirm & Schritte
-# --------------------------------------------------------------------------
 screen() {
   FAILS=0
   header
@@ -232,21 +205,20 @@ note_warn() { printf '  %s!%s %s\n' "$YEL" "$R" "$*"; }
 note_err()  { printf '  %s✖%s %s\n' "$RED" "$R" "$*"; }
 
 wait_key() {
-  printf '\n  %sEnter drücken, um zurückzukehren …%s' "$DIM" "$R"
+  printf '\n  %sPress Enter to go back …%s' "$DIM" "$R"
   IFS= read -rsn1 _ || true
 }
 
 finish() {
   echo
   if (( FAILS == 0 )); then
-    printf '  %s✔ Fertig.%s\n' "$ACC$B" "$R"
+    printf '  %s✔ Done.%s\n' "$ACC$B" "$R"
   else
-    printf '  %s✖ %d Schritt(e) fehlgeschlagen.%s %sLog: %s%s\n' "$RED" "$FAILS" "$R" "$DIM" "$LOG" "$R"
+    printf '  %s✖ %d step(s) failed.%s %sLog: %s%s\n' "$RED" "$FAILS" "$R" "$DIM" "$LOG" "$R"
   fi
   wait_key
 }
 
-# run_step "Beschreibung" befehl args ...
 run_step() {
   local msg="$1"; shift
   local -a frames=(⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏)
@@ -271,24 +243,21 @@ run_step() {
   return "$rc"
 }
 
-# --------------------------------------------------------------------------
-# Adminrechte, Pakete, Flatpak
-# --------------------------------------------------------------------------
 ADMIN_OK=""
 need_admin() {
   if [[ -z "$ADMIN_OK" ]]; then
     if (( EUID == 0 )); then
       ADMIN_OK=0
     elif ! has sudo; then
-      note_err "sudo nicht gefunden – bitte als root ausführen."
+      note_err "sudo not found – please run as root."
       ADMIN_OK=1
     else
-      note "Administratorrechte werden benötigt."
+      note "Administrator rights are required."
       cur_show
       sudo -v
       ADMIN_OK=$?
       cur_hide
-      (( ADMIN_OK != 0 )) && note_err "Authentifizierung fehlgeschlagen."
+      (( ADMIN_OK != 0 )) && note_err "Authentication failed."
     fi
   fi
   return "$ADMIN_OK"
@@ -300,20 +269,19 @@ pkg_install() {
     dnf)    $SUDO dnf install -y "$@" ;;
     pacman) $SUDO pacman -S --needed --noconfirm "$@" ;;
     zypper) $SUDO zypper --non-interactive install "$@" ;;
-    *)      echo "Kein unterstützter Paketmanager gefunden."; return 1 ;;
+    *)      echo "No supported package manager found."; return 1 ;;
   esac
 }
 
 INDEX_DONE=0
 refresh_index() {
   if [[ "$PM" == "apt" && $INDEX_DONE -eq 0 ]]; then
-    run_step "Paketlisten aktualisieren" $SUDO apt-get update || return 1
+    run_step "Update package lists" $SUDO apt-get update || return 1
     INDEX_DONE=1
   fi
   return 0
 }
 
-# pkg_step "Beschreibung" paket ...
 pkg_step() {
   local msg="$1"; shift
   need_admin || return 1
@@ -324,18 +292,18 @@ pkg_step() {
 ensure_flatpak() {
   need_admin || return 1
   if ! has flatpak; then
-    pkg_step "Flatpak installieren" flatpak || return 1
-    note_warn "Nach der Flatpak-Installation ist evtl. ein Neustart nötig, damit Apps im Menü erscheinen."
+    pkg_step "Install Flatpak" flatpak || return 1
+    note_warn "A restart may be needed after installing Flatpak before apps show up in your menu."
   fi
   if ! flatpak remotes --system --columns=name 2>/dev/null | grep -qx flathub; then
-    run_step "Flathub einrichten" $SUDO flatpak remote-add --if-not-exists --system flathub "$FLATHUB_URL" || return 1
+    run_step "Set up Flathub" $SUDO flatpak remote-add --if-not-exists --system flathub "$FLATHUB_URL" || return 1
   fi
   return 0
 }
 
-install_flatpak_app() {  # id name
+install_flatpak_app() {
   ensure_flatpak || return 1
-  run_step "$2 installieren" $SUDO flatpak install -y --noninteractive --system flathub "$1"
+  run_step "Install $2" $SUDO flatpak install -y --noninteractive --system flathub "$1"
 }
 
 INSTALLED=""
@@ -344,18 +312,15 @@ refresh_installed() {
   has flatpak && INSTALLED="$(flatpak list --app --columns=application 2>/dev/null)"
 }
 is_installed() { grep -qx "$1" <<<"$INSTALLED"; }
-mark() { if is_installed "$1"; then printf ' · ✔ installiert'; fi; }
+mark() { if is_installed "$1"; then printf ' · ✔ installed'; fi; }
 
-# --------------------------------------------------------------------------
-# Java
-# --------------------------------------------------------------------------
 java_major() {
   has java || { echo 0; return; }
   java -version 2>&1 | awk -F'"' '/version/ { split($2, a, "."); print (a[1] == 1 ? a[2] : a[1]); exit }'
 }
 java_ok() { local m; m="$(java_major)"; (( ${m:-0} >= 21 )); }
 
-java_install() {  # headless|full
+java_install() {
   local sfx=""
   [[ "$1" == "headless" ]] && sfx="-headless"
   case "$PM" in
@@ -366,12 +331,12 @@ java_install() {  # headless|full
   esac
 }
 
-java_step() {  # headless|full
+java_step() {
   need_admin || return 1
   refresh_index || return 1
-  run_step "Java installieren (OpenJDK 21)" java_install "$1" || return 1
+  run_step "Install Java (OpenJDK 21)" java_install "$1" || return 1
   if ! java_ok; then
-    note_warn "Es wurde nur Java $(java_major) gefunden – neue Minecraft-Versionen benötigen Java 21."
+    note_warn "Only Java $(java_major) is available – recent Minecraft versions need Java 21."
   fi
   return 0
 }
@@ -385,7 +350,7 @@ server_download() {
   meta="$(curl -fsSL "$vurl")" || return 1
   surl="$(jq -r '.downloads.server.url // empty' <<<"$meta")"
   sha="$(jq -r '.downloads.server.sha1 // empty' <<<"$meta")"
-  [[ -n "$surl" ]] || { echo "Kein Server-Download für ${latest} gefunden."; return 1; }
+  [[ -n "$surl" ]] || { echo "No server download found for ${latest}."; return 1; }
   curl -fsSL -o "${dir}/server.jar" "$surl" || return 1
   if [[ -n "$sha" ]]; then
     echo "${sha}  ${dir}/server.jar" | sha1sum -c - || return 1
@@ -393,7 +358,7 @@ server_download() {
   echo "$latest" >"${dir}/.mc-version"
 }
 
-write_server_files() {  # dir ram eula(0/1)
+write_server_files() {
   local dir="$1" ram="$2" eula="$3"
   cat >"${dir}/start.sh" <<EOF
 #!/usr/bin/env bash
@@ -405,22 +370,21 @@ EOF
   return 0
 }
 
-# Abfragen für den Server, bevor der Ausgabe-Bildschirm startet
 SRV_DIR=""; SRV_RAM="2G"; SRV_EULA=0
 server_prompt() {
-  tui_input "Installationsordner für den Java-Server" "$SERVER_DIR_DEFAULT"
+  tui_input "Install directory for the Java server" "$SERVER_DIR_DEFAULT"
   SRV_DIR="$INPUT_RESULT"
 
   local -a ram_items=(
-    "1G|1 GB|kleine Welten, wenige Spieler"
-    "2G|2 GB|empfohlener Standard"
-    "4G|4 GB|mehr Spieler oder Mods"
-    "8G|8 GB|große Server"
+    "1G|1 GB|small worlds, few players"
+    "2G|2 GB|recommended default"
+    "4G|4 GB|more players or mods"
+    "8G|8 GB|large servers"
   )
-  tui_menu "Arbeitsspeicher für den Server" ram_items 1 || return 1
+  tui_menu "Memory for the server" ram_items 1 || return 1
   SRV_RAM="$MENU_RESULT"
 
-  if tui_confirm "Minecraft EULA akzeptieren?" "https://aka.ms/MinecraftEULA"; then
+  if tui_confirm "Accept the Minecraft EULA?" "https://aka.ms/MinecraftEULA"; then
     SRV_EULA=1
   else
     SRV_EULA=0
@@ -433,30 +397,27 @@ install_java_server() {
   has curl || need+=(curl)
   has jq   || need+=(jq)
   if (( ${#need[@]} )); then
-    pkg_step "Werkzeuge installieren (${need[*]})" "${need[@]}" || return 1
+    pkg_step "Install tools (${need[*]})" "${need[@]}" || return 1
   fi
   if ! java_ok; then
     java_step headless || return 1
   fi
-  run_step "Server herunterladen & prüfen" server_download "$SRV_DIR" || return 1
-  run_step "Startskript erstellen" write_server_files "$SRV_DIR" "$SRV_RAM" "$SRV_EULA" || return 1
+  run_step "Download and verify server" server_download "$SRV_DIR" || return 1
+  run_step "Create start script" write_server_files "$SRV_DIR" "$SRV_RAM" "$SRV_EULA" || return 1
 
   local ver; ver="$(cat "${SRV_DIR}/.mc-version" 2>/dev/null)"
   echo
-  note "Version ${ver} liegt in ${SRV_DIR}"
-  note "Starten:  ${SRV_DIR}/start.sh"
+  note "Version ${ver} is in ${SRV_DIR}"
+  note "Start it with:  ${SRV_DIR}/start.sh"
   if (( SRV_EULA == 0 )); then
-    note_warn "EULA nicht akzeptiert – setze 'eula=true' in ${SRV_DIR}/eula.txt vor dem Start."
+    note_warn "EULA not accepted – set 'eula=true' in ${SRV_DIR}/eula.txt before starting."
   fi
-  note "Port 25565 (TCP) muss in der Firewall offen sein, damit andere beitreten können."
+  note "Port 25565 (TCP) must be open in your firewall so others can join."
 }
 
-# --------------------------------------------------------------------------
-# Menüs
-# --------------------------------------------------------------------------
 no_desktop_hint() {
   if [[ -z "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]]; then
-    note_warn "Kein Desktop erkannt – Launcher brauchen eine grafische Oberfläche."
+    note_warn "No desktop detected – launchers need a graphical environment."
   fi
 }
 
@@ -464,9 +425,9 @@ menu_java() {
   refresh_installed
   local -a items=(
     "runtime|Java Runtime|OpenJDK 21|0"
-    "prism|Prism Launcher|Mods & Instanzen (empfohlen)$(mark "$ID_PRISM")|1"
-    "official|Offizieller Launcher|Flatpak$(mark "$ID_OFFICIAL")|0"
-    "server|Java-Server|neueste Version direkt von Mojang|0"
+    "prism|Prism Launcher|mods & instances (recommended)$(mark "$ID_PRISM")|1"
+    "official|Official Launcher|Flatpak$(mark "$ID_OFFICIAL")|0"
+    "server|Java Server|latest release straight from Mojang|0"
   )
   tui_multi "Java Edition" items || return 0
   (( ${#CHOSEN[@]} )) || return 0
@@ -477,12 +438,12 @@ menu_java() {
     server_prompt || return 0
   fi
 
-  screen "Java Edition installieren"
+  screen "Installing Java Edition"
   for t in "${CHOSEN[@]}"; do
     case "$t" in
       runtime)  java_step full ;;
       prism)    no_desktop_hint; install_flatpak_app "$ID_PRISM" "Prism Launcher" ;;
-      official) no_desktop_hint; install_flatpak_app "$ID_OFFICIAL" "Offizieller Launcher" ;;
+      official) no_desktop_hint; install_flatpak_app "$ID_OFFICIAL" "Official Launcher" ;;
       server)   install_java_server ;;
     esac
   done
@@ -497,12 +458,12 @@ menu_bedrock() {
   tui_multi "Bedrock Edition" items || return 0
   (( ${#CHOSEN[@]} )) || return 0
 
-  screen "Bedrock Edition installieren"
+  screen "Installing Bedrock Edition"
   no_desktop_hint
   if install_flatpak_app "$ID_BEDROCK" "Bedrock Launcher"; then
     echo
-    note "Benötigt eine legale Android-Kopie von Minecraft Bedrock (Google-Play-Konto),"
-    note "einen OpenGL-fähigen Grafiktreiber und ein 64-Bit-System."
+    note "Requires a legitimate Android copy of Minecraft Bedrock (Google Play account),"
+    note "an OpenGL-capable graphics driver and a 64-bit system."
   fi
   finish
 }
@@ -511,37 +472,37 @@ menu_remove() {
   refresh_installed
   local -a items=()
   is_installed "$ID_PRISM"    && items+=("${ID_PRISM}|Prism Launcher||0")
-  is_installed "$ID_OFFICIAL" && items+=("${ID_OFFICIAL}|Offizieller Launcher||0")
+  is_installed "$ID_OFFICIAL" && items+=("${ID_OFFICIAL}|Official Launcher||0")
   is_installed "$ID_BEDROCK"  && items+=("${ID_BEDROCK}|Bedrock Launcher||0")
 
   if (( ${#items[@]} == 0 )); then
-    screen "Deinstallieren"
-    note "Es sind keine Launcher über Flatpak installiert."
+    screen "Uninstall"
+    note "No launchers are installed via Flatpak."
     wait_key
     return 0
   fi
 
-  tui_multi "Deinstallieren" items || return 0
+  tui_multi "Uninstall" items || return 0
   (( ${#CHOSEN[@]} )) || return 0
-  tui_confirm "Ausgewählte Launcher wirklich entfernen?" || return 0
+  tui_confirm "Really remove the selected launchers?" || return 0
 
-  screen "Deinstallieren"
+  screen "Uninstall"
   need_admin || { finish; return 0; }
   local id
   for id in "${CHOSEN[@]}"; do
-    run_step "${id} entfernen" $SUDO flatpak uninstall -y --noninteractive --system "$id"
+    run_step "Remove ${id}" $SUDO flatpak uninstall -y --noninteractive --system "$id"
   done
   finish
 }
 
 main_menu() {
   local -a items=(
-    "java|Java Edition|Launcher, Runtime & Server"
-    "bedrock|Bedrock Edition|Launcher"
-    "remove|Deinstallieren|installierte Launcher entfernen"
-    "exit|Beenden|"
+    "java|Java Edition|launcher, runtime & server"
+    "bedrock|Bedrock Edition|launcher"
+    "remove|Uninstall|remove installed launchers"
+    "exit|Exit|"
   )
-  while tui_menu "Was möchtest du tun?" items; do
+  while tui_menu "What would you like to do?" items; do
     case "$MENU_RESULT" in
       java)    menu_java ;;
       bedrock) menu_bedrock ;;
@@ -551,14 +512,11 @@ main_menu() {
   done
 }
 
-# --------------------------------------------------------------------------
-# Start / Ende
-# --------------------------------------------------------------------------
 cleanup() {
   printf '%s' "${ESC}[?25h${ESC}[?1049l"
   stty sane 2>/dev/null || true
   if (( TOTAL_FAILS > 0 )); then
-    printf 'Es gab Fehler. Log: %s\n' "$LOG"
+    printf 'There were errors. Log: %s\n' "$LOG"
   else
     rm -f "$LOG"
   fi
@@ -568,12 +526,12 @@ usage() {
   cat <<EOF
 ${APP} v${VERSION}
 
-Nutzung: $0 [Option]
+Usage: $0 [option]
 
-  -h, --help      Diese Hilfe anzeigen
-  -v, --version   Version anzeigen
+  -h, --help      Show this help
+  -v, --version   Show the version
 
-Bedienung: Pfeiltasten (oder j/k) · Leertaste auswählen · Enter bestätigen · q zurück
+Controls: arrow keys (or j/k) · Space toggle · Enter confirm · q back
 EOF
 }
 
@@ -584,13 +542,13 @@ main() {
   esac
 
   if [[ "$(uname -s)" != "Linux" ]]; then
-    echo "Dieses Skript funktioniert nur unter Linux." >&2; exit 1
+    echo "This script only works on Linux." >&2; exit 1
   fi
   if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 3) )); then
-    echo "Bash 4.3 oder neuer wird benötigt." >&2; exit 1
+    echo "Bash 4.3 or newer is required." >&2; exit 1
   fi
   if [[ ! -t 0 || ! -t 1 ]]; then
-    echo "Bitte in einem interaktiven Terminal starten." >&2; exit 1
+    echo "Please run this in an interactive terminal." >&2; exit 1
   fi
 
   detect_system
